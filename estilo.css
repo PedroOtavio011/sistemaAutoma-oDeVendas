@@ -1,0 +1,47 @@
+/* Configuração de Cores de Fundo do Painel */
+.fundo-sistema {
+    background-color: #f3f4f6;
+}
+
+/* ==========================================================================
+   REGRAS DE IMPRESSÃO CONFIGURÁVEIS (A4 vs Térmica)
+   ========================================================================== */
+@media print {
+    /* Esconde o painel do sistema na hora de imprimir */
+    body * {
+        visibility: hidden;
+    }
+    
+    #espaco-cupom-impressao, #espaco-cupom-impressao * {
+        visibility: visible;
+    }
+    
+    #espaco-cupom-impressao {
+        position: absolute;
+        left: 0;
+        top: 0;
+        color: #000;
+    }
+
+    /* CONFIGURAÇÃO A4: Letra legível, layout limpo e centralizado */
+    #espaco-cupom-impressao.modo-a4 {
+        width: 100%;
+        max-width: 180mm;
+        margin: 20mm auto;
+        font-family: 'Arial', sans-serif;
+        font-size: 16px;
+        line-height: 1.5;
+    }
+
+    /* CONFIGURAÇÃO TÉRMICA: Letra compacta, tamanho de bobina */
+    #espaco-cupom-impressao.modo-termica {
+        width: 80mm; 
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 14px;
+        line-height: 1.2;
+    }
+
+    .nao-imprimir {
+        display: none !important;
+    }
+}
