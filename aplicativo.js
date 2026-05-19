@@ -20,7 +20,11 @@ const tabelaCarrinhoCorpo = document.getElementById('corpo-tabela-carrinho');
 const spanTotalNota = document.getElementById('total-nota');
 const containerHistoricoVendas = document.getElementById('container-historico');
 
-// --- SISTEMA DE NAVEGAÇÃO DE ABAS ---
+// --- INICIALIZAÇÃO AUTOMÁTICA ---
+document.addEventListener("DOMContentLoaded", () => {
+    iniciarSistema();
+});
+
 // --- SISTEMA DE NAVEGAÇÃO DE ABAS CORRIGIDO ---
 function mudarAba(idAbaAlvo) {
     const todasAbas = document.querySelectorAll('.aba-conteudo');
@@ -30,7 +34,6 @@ function mudarAba(idAbaAlvo) {
 
     const todosBotoes = document.querySelectorAll('.aba-botao');
     todosBotoes.forEach(botao => {
-        // Reseta o botão para o padrão Escuro (Inativo)
         botao.classList.remove('bg-yellow-400', 'text-black', 'bg-zinc-800', 'text-gray-300', 'hover:bg-zinc-700');
         botao.classList.add('bg-zinc-800', 'text-gray-300', 'hover:bg-zinc-700');
     });
@@ -38,7 +41,6 @@ function mudarAba(idAbaAlvo) {
     let idBotaoAtivo = 'botao-' + idAbaAlvo;
     const botaoAtivo = document.getElementById(idBotaoAtivo);
     
-    // Aplica o estilo Destacado (Ativo) no botão clicado
     botaoAtivo.classList.remove('bg-zinc-800', 'text-gray-300', 'hover:bg-zinc-700');
     botaoAtivo.classList.add('bg-yellow-400', 'text-black');
 }
@@ -71,6 +73,7 @@ async function buscarHistoricoBanco() {
     if (error) return console.error('Falha ao sincronizar vendas:', error);
     
     matrizHistoricoVendas = data;
+    // ALTERAÇÃO AQUI: Passamos um array vazio [] para que a tela comece limpa
     renderizarPainelHistorico([]); 
 }
 
@@ -80,7 +83,6 @@ function renderizarPainelClientes() {
     seletorVendaCliente.innerHTML = '<option value="">-- Escolha um Cliente --</option>';
     
     matrizClientes.forEach(cliente => {
-        // Formata o nome para incluir a cidade se ela existir
         const exibicaoCliente = cliente.cidade ? `${cliente.nome} (${cliente.cidade})` : cliente.nome;
 
         seletorVendaCliente.innerHTML += `<option value="${exibicaoCliente}">${exibicaoCliente}</option>`;
@@ -100,15 +102,18 @@ function renderizarPainelProdutos() {
         seletorVendaProduto.innerHTML += `<option value="${produto.id}">${produto.nome} - R$ ${parseFloat(produto.preco).toFixed(2)}</option>`;
         containerListaProdutos.innerHTML += `
             <li class="flex justify-between items-center py-2 text-sm text-gray-700">
-                <span>${produto.nome} (R$ ${parseFloat(produto.preco).toFixed(2)})</span>
-                <button onclick="removerProdutoDoBanco(${produto.id})" class="text-red-500 hover:text-red-700 font-bold">Excluir</button>
+                <span><strong>${produto.nome}</strong> (R$ ${parseFloat(produto.preco).toFixed(2)})</span>
+                <div class="flex gap-4">
+                    <button onclick="prepararEdicaoProduto(${produto.id})" class="text-blue-600 hover:text-blue-800 font-bold">✏️ Editar</button>
+                    <button onclick="removerProdutoDoBanco(${produto.id})" class="text-red-500 hover:text-red-700 font-bold">Excluir</button>
+                </div>
             </li>`;
     });
 }
 
 function renderizarPainelHistorico(listaVendas) {
     containerHistoricoVendas.innerHTML = '';
-    if (listaVendas.length === 0) {
+    if (!listaVendas || listaVendas.length === 0) {
         containerHistoricoVendas.innerHTML = '<p class="text-gray-400 text-sm">Nenhum registro encontrado para este filtro.</p>';
         return;
     }
@@ -123,21 +128,69 @@ function renderizarPainelHistorico(listaVendas) {
                 </div>
                 <div class="text-md font-bold text-gray-800">${venda.cliente_nome}</div>
                 <div class="text-xs text-gray-600 bg-white p-2 rounded border max-h-20 overflow-y-auto">
-                    ${venda.itens.map(item => `${item.quantidade}x ${item.nome}`).join(' | ')}
+                    ${venda.itens.map(item => `${item.quantidade}x ${item.nome} (R$ ${parseFloat(item.preco).toFixed(2)})`).join(' | ')}
                 </div>
-                <button onclick="gerarLayoutCupom(${JSON.stringify(venda).replace(/"/g, '&quot;')})" class="w-full text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 rounded font-medium">
-                    🖨️ Reimprimir Nota Fiscal
+                <button onclick='refazerPedidoAntigo(${JSON.stringify(venda)})' class="w-full text-xs bg-green-600 hover:bg-green-700 text-white py-2 rounded font-medium transition shadow mb-1">
+                    🔄 Refazer este Pedido (Nova Data)
+                </button>
+                <button onclick='gerarLayoutCupom(${JSON.stringify(venda)})' class="w-full text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 rounded font-medium">
+                    🖨️ Reimprimir Nota 
                 </button>
             </div>`;
     });
 }
 
-// --- EVENTOS DE CADASTROS (INSERÇÃO) ---
+function refazerPedidoAntigo(dadosVendaAntiga) {
+    // 1. Pergunta para confirmar e não fazer por engano
+    if (!confirm(`Deseja carregar os itens do pedido de "${dadosVendaAntiga.cliente_nome}" para uma nova venda?`)) {
+        return;
+    }
+
+    // 2. Limpa qualquer coisa que já estivesse no carrinho atual antes
+    resetarPainelParaNovaNota();
+
+    // 3. Seleciona automaticamente o cliente no menu drop-down
+    seletorVendaCliente.value = dadosVendaAntiga.cliente_nome;
+
+    // 4. Copia os itens do histórico para o carrinho de trabalho atual
+    // Usamos o 'map' para garantir que os dados sejam copiados sem vínculos com o passado
+    carrinhoVendaAtual = dadosVendaAntiga.itens.map(item => ({
+        id: item.id,
+        nome: item.nome,
+        preco: item.preco, // Mantém o preço que foi cobrado no dia (ótimo para os clientes antigos!)
+        quantidade: item.quantidade
+    }));
+
+    // 5. Atualiza a tabela visual do carrinho para mostrar os itens na tela
+    atualizarGradeCarrinho();
+
+    // 6. Muda de aba automaticamente para o cliente já ver a nota montada
+    mudarAba('aba-notas');
+    
+    alert("Itens carregados com sucesso! Revise os valores e clique em 'Finalizar Nota' para salvar com a data de hoje.");
+}
+
+function filtrarHistoricoPorCliente() {
+    const termoBusca = document.getElementById('filtro-cliente').value.toLowerCase().trim();
+    
+    
+    if (termoBusca === '') {
+        renderizarPainelHistorico([]);
+        return;
+    }
+    
+    const filtrados = matrizHistoricoVendas.filter(venda => 
+        venda.cliente_nome.toLowerCase().includes(termoBusca)
+    );
+    renderizarPainelHistorico(filtrados);
+}
+
+// --- EVENTOS DE CADASTROS / ATUALIZAÇÕES ---
 document.getElementById('formulario-cliente').addEventListener('submit', async (evento) => {
     evento.preventDefault();
     const nomeCliente = document.getElementById('cliente-nome').value.trim();
     const cidadeCliente = document.getElementById('cliente-cidade').value.trim();
-    const telefoneCliente = document.getElementById('cliente-telefone').value.trim(); // Captura o telefone
+    const telefoneCliente = document.getElementById('cliente-telefone').value.trim();
 
     const { error } = await conexaoSupabase.from('clientes').insert([
         { nome: nomeCliente, cidade: cidadeCliente, telefone: telefoneCliente }
@@ -148,17 +201,63 @@ document.getElementById('formulario-cliente').addEventListener('submit', async (
     buscarClientesBanco();
 });
 
+// FORMULÁRIO DE PRODUTOS (Salva Novo OU Atualiza Existente)
 document.getElementById('formulario-produto').addEventListener('submit', async (evento) => {
     evento.preventDefault();
+    const idEdicao = document.getElementById('produto-id-edicao').value;
     const nomeProduto = document.getElementById('produto-nome').value.trim();
     const precoProduto = parseFloat(document.getElementById('produto-preco').value);
 
-    const { error } = await conexaoSupabase.from('produtos').insert([{ nome: nomeProduto, preco: precoProduto }]);
-    if (error) return alert('Erro ao salvar produto: ' + error.message);
+    if (idEdicao) {
+        // Modo Edição (Update)
+        const { error } = await conexaoSupabase
+            .from('produtos')
+            .update({ nome: nomeProduto, preco: precoProduto })
+            .eq('id', idEdicao);
+
+        if (error) return alert('Erro ao atualizar produto: ' + error.message);
+        alert('Produto atualizado com sucesso!');
+        cancelarEdicaoProduto();
+    } else {
+        // Modo Cadastro Novo (Insert)
+        const { error } = await conexaoSupabase.from('produtos').insert([{ nome: nomeProduto, preco: precoProduto }]);
+        if (error) return alert('Erro ao salvar produto: ' + error.message);
+    }
 
     document.getElementById('formulario-produto').reset();
     buscarProdutosBanco();
 });
+
+// Prepara o formulário para fazer a alteração do produto
+function prepararEdicaoProduto(idProduto) {
+    const produto = matrizProdutos.find(p => p.id === idProduto);
+    if (!produto) return;
+
+    document.getElementById('produto-id-edicao').value = produto.id;
+    document.getElementById('produto-nome').value = produto.nome;
+    document.getElementById('produto-preco').value = produto.preco;
+
+    // Altera a identidade visual para avisar que está editando
+    document.getElementById('titulo-formulario-produto').innerText = "✏️ Alterar Dados do Produto";
+    document.getElementById('botao-salvar-produto').innerText = "Atualizar Produto";
+    document.getElementById('botao-salvar-produto').classList.replace('bg-blue-600', 'bg-amber-500');
+    document.getElementById('botao-salvar-produto').classList.replace('hover:bg-blue-700', 'hover:bg-amber-600');
+    document.getElementById('botao-cancelar-edicao').classList.remove('hidden');
+
+    // Rola a página de volta para o formulário de forma suave
+    document.getElementById('formulario-produto').scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelarEdicaoProduto() {
+    document.getElementById('produto-id-edicao').value = "";
+    document.getElementById('formulario-produto').reset();
+
+    document.getElementById('titulo-formulario-produto').innerText = "📦 Cadastrar Novo Produto";
+    document.getElementById('botao-salvar-produto').innerText = "Salvar Produto";
+    document.getElementById('botao-salvar-produto').classList.replace('bg-amber-500', 'bg-blue-600');
+    document.getElementById('botao-salvar-produto').classList.replace('hover:bg-amber-600', 'hover:bg-blue-700');
+    document.getElementById('botao-cancelar-edicao').classList.add('hidden');
+}
 
 // --- REMOÇÕES DE DADOS ---
 async function removerClienteDoBanco(id) {
@@ -191,11 +290,27 @@ function adicionarProdutoAoCarrinho() {
         carrinhoVendaAtual.push({
             id: correspondenteProduto.id,
             nome: correspondenteProduto.nome,
-            preco: correspondenteProduto.preco,
+            preco: correspondenteProduto.preco, // Preço padrão inicial
             quantidade: quantidadeDigitada
         });
     }
     atualizarGradeCarrinho();
+}
+
+// Função para o usuário mudar o preço dinamicamente na tabela
+function alterarPrecoItemCarrinho(index, novoPreco) {
+    const valorNum = parseFloat(novoPreco);
+    if (isNaN(valorNum) || valorNum < 0) return;
+    
+    carrinhoVendaAtual[index].preco = valorNum;
+    
+    // Recalcula o subtotal e total sem redesenhar os inputs (evita perder o foco da digitação)
+    let acumuladorTotal = 0;
+    carrinhoVendaAtual.forEach((item, idx) => {
+        const subtotalItem = item.preco * item.quantidade;
+        acumuladorTotal += subtotalItem;
+    });
+    spanTotalNota.innerText = acumuladorTotal.toFixed(2);
 }
 
 function atualizarGradeCarrinho() {
@@ -207,9 +322,13 @@ function atualizarGradeCarrinho() {
         acumuladorTotal += subtotalItem;
         tabelaCarrinhoCorpo.innerHTML += `
             <tr class="border-b">
-                <td class="py-2">${item.nome}</td>
+                <td class="py-2 font-medium">${item.nome}</td>
                 <td>${item.quantidade}x</td>
-                <td>R$ ${subtotalItem.toFixed(2)}</td>
+                <td>
+                    <input type="number" step="0.01" min="0" value="${item.preco.toFixed(2)}" 
+                        oninput="alterarPrecoItemCarrinho(${index}, this.value)" 
+                        class="w-20 p-1 border border-gray-300 rounded font-bold text-center bg-yellow-50 focus:ring-2 focus:ring-yellow-400 focus:outline-none">
+                </td>
                 <td class="text-right">
                     <button onclick="removerProdutoDoCarrinho(${index})" class="text-red-500 hover:text-red-700 font-bold px-2">❌</button>
                 </td>
@@ -219,10 +338,7 @@ function atualizarGradeCarrinho() {
 }
 
 function removerProdutoDoCarrinho(indexDoItem) {
-    // Remove o item da matriz usando a posição dele
     carrinhoVendaAtual.splice(indexDoItem, 1);
-    
-    // Atualiza a tela e recalcula o total automaticamente
     atualizarGradeCarrinho();
 }
 
@@ -245,14 +361,11 @@ async function finalizarESalvarNota() {
 
         if (error) throw error;
 
-        // Guarda a venda salva na memória global para os botões de ação usarem
         ultimaVendaGerada = data[0];
 
-        // Altera os botões na tela: esconde o finalizar e mostra os novos botões
         botaoAcaoNota.classList.add('hidden');
         document.getElementById('bloco-acoes-pos-venda').classList.remove('hidden');
 
-        // Atualiza a lista do histórico em background
         await buscarHistoricoBanco();
 
     } catch (erroGeral) {
@@ -262,23 +375,18 @@ async function finalizarESalvarNota() {
     }
 }
 
-// --- IMPRESSÃO ACIONADA PELO NOVO BOTÃO ---
 function dispararImpressaoFisica() {
     if (!ultimaVendaGerada) return alert("Nenhuma nota gerada para imprimir.");
     gerarLayoutCupom(ultimaVendaGerada);
 }
 
-// --- ENVIO DA NOTA TEXTUAL FORMATADA VIA WHATSAPP ---
 function enviarNotaWhatsApp() {
     if (!ultimaVendaGerada) return alert("Nenhuma nota gerada para enviar.");
 
-    // Tenta encontrar o telefone correspondente na nossa lista de clientes
     const nomeBruto = ultimaVendaGerada.cliente_nome.split(' (')[0];
     const clienteEncontrado = matrizClientes.find(c => c.nome === nomeBruto);
-    
     const telefoneDestino = clienteEncontrado ? clienteEncontrado.telefone.replace(/\D/g, '') : '';
     
-    // Monta a mensagem de texto com uma formatação limpa e organizada
     let textoMensagem = `*FDTECH - RESUMO DO PEDIDO*\n`;
     textoMensagem += `-----------------------------------\n`;
     textoMensagem += `*Cliente:* ${ultimaVendaGerada.cliente_nome}\n`;
@@ -288,36 +396,30 @@ function enviarNotaWhatsApp() {
     
     ultimaVendaGerada.itens.forEach(item => {
         const sub = item.preco * item.quantidade;
-        textoMensagem += `▪️ ${item.quantidade}x ${item.nome} -> R$ ${sub.toFixed(2)}\n`;
+        textoMensagem += `▪️ ${item.quantidade}x ${item.nome} (un: R$ ${parseFloat(item.preco).toFixed(2)}) -> R$ ${sub.toFixed(2)}\n`;
     });
     
     textoMensagem += `-----------------------------------\n`;
     textoMensagem += `*TOTAL GERAL: R$ ${parseFloat(ultimaVendaGerada.total).toFixed(2)}*\n\n`;
     textoMensagem += `_Obrigado pela preferência!_`;
-    textoMensagem += `\n\n*GERADO POR: FDTECH*`;
 
-    // Codifica o texto para formato de URL
     const linkWhatsApp = `https://api.whatsapp.com/send?phone=55${telefoneDestino}&text=${encodeURIComponent(textoMensagem)}`;
-    
-    // Abre em uma nova aba do navegador
     window.open(linkWhatsApp, '_blank');
 }
 
-// --- VOLTA O PAINEL PARA O ESTADO INICIAL PARA A PRÓXIMA VENDA ---
 function resetarPainelParaNovaNota() {
     ultimaVendaGerada = null;
     carrinhoVendaAtual = [];
     seletorVendaCliente.value = '';
     atualizarGradeCarrinho();
     
-    // Restaura a visibilidade dos botões
     document.getElementById('botao-finalizar-nota').classList.remove('hidden');
     document.getElementById('botao-finalizar-nota').disabled = false;
     document.getElementById('botao-finalizar-nota').innerText = "💾 Finalizar Nota";
     document.getElementById('bloco-acoes-pos-venda').classList.add('hidden');
 }
 
-// --- FUNÇÃO GERAR LAYOUT CUPOM (Sem a limpeza automática imediata da memória) ---
+// --- LAYOUT DE IMPRESSÃO ---
 function gerarLayoutCupom(dadosVenda) {
     const divAlvoImpressao = document.getElementById('espaco-cupom-impressao');
     const tipoImpressao = document.getElementById('seletor-impressao').value;
@@ -366,8 +468,7 @@ function gerarLayoutCupom(dadosVenda) {
                     <span style="font-size: 24px; font-weight: black; background: #000; color: #fff; padding: 5px 15px; border-radius: 4px;">R$ ${parseFloat(dadosVenda.total).toFixed(2)}</span>
                 </div>
                 <div style="text-align: center; margin-top: 50px; font-size: 12px; color: #666;">Documento sem valor fiscal - Gerado por FDTECH Sistema de Faturamento.</div>
-            </div>
-        `;
+            </div>`;
     } else {
         divAlvoImpressao.innerHTML = `
             <div style="max-width: 220px;">
@@ -385,115 +486,9 @@ function gerarLayoutCupom(dadosVenda) {
                 </div>
                 <br>
                 <div style="text-align: center; font-style: italic;">Obrigado pela Preferência!</div>
-                <div style="margin-top: 20px; text-align: center;">.</div>
-            </div>
-        `;
+            </div>`;
     }
         
     window.print();
     divAlvoImpressao.innerHTML = ''; 
 }
-
-// Altere de "generar..." para "gerar..."
-function gerarLayoutCupom(dadosVenda) {
-    const divAlvoImpressao = document.getElementById('espaco-cupom-impressao');
-    const tipoImpressao = document.getElementById('seletor-impressao').value;
-    
-    let listaItensFormatada = '';
-    const dataNota = new Date(dadosVenda.criado_em || new Date()).toLocaleString('pt-BR');
-
-    dadosVenda.itens.forEach(item => {
-        const subtotal = item.preco * item.quantidade;
-        if (tipoImpressao === 'modo-a4') {
-            listaItensFormatada += `
-            <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #ddd;">
-                <span>${item.nome} (x${item.quantidade})</span>
-                <span>R$ ${subtotal.toFixed(2)}</span>
-            </div>`;
-        } else {
-            listaItensFormatada += `
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; max-width: 220px;">
-                <span style="max-width: 65%; word-break: break-word;">
-                    ${item.quantidade}x ${item.nome}
-                    <small style="display: block; color: #555; font-size: 9px;">(un: R$ ${parseFloat(item.preco).toFixed(2)})</small>
-                </span>
-                <span style="font-weight: bold; white-space: nowrap;">R$ ${subtotal.toFixed(2)}</span>
-            </div>`;
-        }
-    });
-
-    const divisor = tipoImpressao === 'modo-a4' ? '<hr style="border: 1px solid #000; margin: 15px 0;">' : '<div>--------------------------------</div>';
-
-    if (tipoImpressao === 'modo-a4') {
-        divAlvoImpressao.innerHTML = `
-            <div style="padding: 20px; border: 2px solid #000; border-radius: 4px;">
-                <div style="text-align: center; font-size: 22px; font-weight: bold; letter-spacing: 2px; margin-bottom: 5px;">FDTECH</div>
-                <div style="text-align: center; font-size: 14px; text-transform: uppercase; font-weight: bold; color: #555;">Documento Auxiliar de Venda</div>
-                ${divisor}
-                <div style="display: flex; justify-content: space-between;">
-                    <div><b>Data de Emissão:</b> ${dataNota}</div>
-                    <div><b>Controle:</b> #${dadosVenda.id}</div>
-                </div>
-                <div style="margin-top: 8px;"><b>Cliente:</b> ${dadosVenda.cliente_nome}</div>
-                ${divisor}
-                <div style="font-weight: bold; margin-bottom: 10px; font-size: 16px;">RELAÇÃO DE PRODUTOS:</div>
-                <div style="margin-bottom: 20px;">${listaItensFormatada}</div>
-                <div style="display: flex; justify-content: flex-end; align-items: center; gap: 15px;">
-                    <span style="font-size: 18px; font-weight: bold;">VALOR TOTAL DO PEDIDO:</span>
-                    <span style="font-size: 24px; font-weight: black; background: #000; color: #fff; padding: 5px 15px; border-radius: 4px;">R$ ${parseFloat(dadosVenda.total).toFixed(2)}</span>
-                </div>
-                <div style="text-align: center; margin-top: 50px; font-size: 12px; color: #666;">Documento sem valor fiscal - Gerado por FDTECH Sistema de Faturamento.</div>
-            </div>
-        `;
-    } else {
-        divAlvoImpressao.innerHTML = `
-            <div style="max-width: 220px;">
-                <div style="text-align: center; font-weight: bold; margin-bottom: 5px;">CUPOM DE VENDA</div>
-                <div>--------------------------------</div>
-                <div><b>Data:</b> ${dataNota}</div>
-                <div><b>Cliente:</b> ${dadosVenda.cliente_nome}</div>
-                <div>--------------------------------</div>
-                <div style="font-weight: bold; margin-bottom: 4px;">ITENS:</div>
-                ${listaItensFormatada}
-                ${divisor}
-                <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 5px; max-width: 220px;">
-                    <span>TOTAL:</span>
-                    <span>R$ ${parseFloat(dadosVenda.total).toFixed(2)}</span>
-                </div>
-                <br>
-                <div style="text-align: center; font-style: italic;">Obrigado pela Preferência!</div>
-                <div style="margin-top: 20px; text-align: center;">.</div>
-            </div>
-        `;
-    }
-        
-    window.print();
-    divAlvoImpressao.innerHTML = ''; 
-}
-// --- FUNÇÃO DE FILTRO/BUSCA POR CLIENTE ---
-function filtrarHistoricoPorCliente() {
-    const termoBusca = document.getElementById('filtro-cliente').value.toLowerCase().trim();
-    
-    // Se não digitou nada, deixa a tela do histórico em branco
-    if (termoBusca === '') {
-        renderizarPainelHistorico([]);
-    } else {
-        // Se digitou, filtra as notas que batem com o nome do cliente
-        const registrosFiltrados = matrizHistoricoVendas.filter(venda => 
-            venda.cliente_nome.toLowerCase().includes(termoBusca)
-        );
-        renderizarPainelHistorico(registrosFiltrados);
-    }
-}
-
-function atualizarTipoImpressao() {
-    const tipoSelecionado = document.getElementById('seletor-impressao').value;
-    const divAlvoImpressao = document.getElementById('espaco-cupom-impressao');
-    
-    // Remove as classes antigas e aplica a nova escolha
-    divAlvoImpressao.className = '';
-    divAlvoImpressao.classList.add(tipoSelecionado);
-}
-
-// Inicialização imediata ao abrir a aplicação
-iniciarSistema();

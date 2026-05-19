@@ -53,8 +53,10 @@
         </section>
 
         <section id="aba-produtos" class="aba-conteudo hidden bg-white p-6 rounded-lg shadow">
-            <h2 class="titulo-secao text-xl font-bold mb-4 text-gray-700">📦 Cadastrar Novo Produto</h2>
+            <h2 id="titulo-formulario-produto" class="titulo-secao text-xl font-bold mb-4 text-gray-700">📦 Cadastrar Novo Produto</h2>
             <form id="formulario-produto" class="espacamento-formulario space-y-4 max-w-md">
+                <input type="hidden" id="produto-id-edicao" value="">
+                
                 <div>
                     <label class="rotulo-campo block text-sm font-medium text-gray-600">Nome do Produto</label>
                     <input type="text" id="produto-nome" required class="campo-entrada w-full p-2 border rounded focus:ring-2 focus:ring-blue-500">
@@ -63,7 +65,10 @@
                     <label class="rotulo-campo block text-sm font-medium text-gray-600">Preço Unitário (R$)</label>
                     <input type="number" id="produto-preco" step="0.01" required class="campo-entrada w-full p-2 border rounded focus:ring-2 focus:ring-blue-500">
                 </div>
-                <button type="submit" class="botao-sucesso bg-blue-600 text-white py-2 px-4 rounded font-bold hover:bg-blue-700">Salvar Produto</button>
+                <div class="flex gap-2">
+                    <button type="submit" id="botao-salvar-produto" class="botao-sucesso bg-blue-600 text-white py-2 px-4 rounded font-bold hover:bg-blue-700">Salvar Produto</button>
+                    <button type="button" id="botao-cancelar-edicao" onclick="cancelarEdicaoProduto()" class="hidden bg-gray-300 text-gray-700 py-2 px-4 rounded font-bold hover:bg-gray-400">Cancelar</button>
+                </div>
             </form>
 
             <h3 class="subtitulo-secao text-md font-bold mt-8 mb-2 text-gray-600">Produtos em Estoque</h3>
@@ -96,9 +101,9 @@
                     <table class="tabela-carrinho w-full text-sm text-left">
                         <thead>
                             <tr class="border-b border-gray-300 text-gray-500">
-                                <th class="pb-2">Item</th>
-                                <th class="pb-2">Qtd</th>
-                                <th class="pb-2">Subtotal</th>
+                                <th class="pb-2 w-2/5">Item</th>
+                                <th class="pb-2 w-1/5">Qtd</th>
+                                <th class="pb-2 w-1/4">Preço (R$) ✏️</th>
                                 <th class="pb-2 text-right">Ação</th>
                             </tr>
                         </thead>
