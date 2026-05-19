@@ -4,30 +4,36 @@
 }
 
 /* ==========================================================================
-   REGRAS DE IMPRESSÃO CONFIGURÁVEIS (A4 vs Térmica)
+   REGRAS DE IMPRESSÃO CONFIGURÁVEIS (A4 vs Térmica) 
    ========================================================================== */
 @media print {
-    /* Esconde o painel do sistema na hora de imprimir */
-    body * {
-        visibility: hidden;
+    /* Esconde COMPLETAMENTE toda a estrutura do sistema, cabeçalho e contêineres */
+    body > *, .nao-imprimir, header, nav, section {
+        display: none !important;
     }
     
-    #espaco-cupom-impressao, #espaco-cupom-impressao * {
-        visibility: visible;
-    }
-    
+    /* Força APENAS o espaço do cupom a existir e ficar visível */
     #espaco-cupom-impressao {
+        display: block !important;
         position: absolute;
         left: 0;
         top: 0;
-        color: #000;
+        margin: 0;
+        padding: 0;
+    }
+
+    /* Garante que elementos internos do cupom também apareçam */
+    #espaco-cupom-impressao * {
+        display: inline-block; /* Mantém flex e alinhamentos funcionando */
+        color: #000000 !important; /* Força cor preta absoluta */
+        background: #ffffff !important; /* Força fundo branco absoluto */
     }
 
     /* CONFIGURAÇÃO A4: Letra legível, layout limpo e centralizado */
     #espaco-cupom-impressao.modo-a4 {
-        width: 100%;
-        max-width: 180mm;
-        margin: 20mm auto;
+        width: 100% !important;
+        max-width: 180mm !important;
+        margin: 10mm auto !important;
         font-family: 'Arial', sans-serif;
         font-size: 16px;
         line-height: 1.5;
@@ -35,13 +41,16 @@
 
     /* CONFIGURAÇÃO TÉRMICA: Letra compacta, tamanho de bobina */
     #espaco-cupom-impressao.modo-termica {
-        width: 80mm; 
+        width: 80mm !important; 
+        max-width: 80mm !important;
         font-family: 'Courier New', Courier, monospace;
-        font-size: 14px;
+        font-size: 13px;
         line-height: 1.2;
     }
 
-    .nao-imprimir {
-        display: none !important;
+    /* Configuração técnica crucial para navegadores mobile aceitarem os estilos */
+    body {
+        -webkit-print-color-adjust: exact !important; /* Chrome/Safari/Android/iOS */
+        print-color-adjust: exact !important;         /* Padrão moderno */
     }
 }
